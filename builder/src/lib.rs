@@ -11,9 +11,25 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let builder_ident = syn::Ident::new(&format!("{}Builder", name), name.span());
 
     let expanded = quote! {
-        impl #name {
-            pub fn builder() -> () {}
+
+        pub struct #builder_ident {
+            executable: Option<String>,
+            args: Option<Vec<String>>,
+            env: Option<Vec<String>>,
+            current_dir: Option<String>,
         }
+
+        impl #name {
+            pub fn builder() -> #builder_ident {
+                #builder_ident {
+                    executable: None,
+                    args: None,
+                    env: None,
+                    current_dir: None,
+                }
+            }
+        }
+
 
     };
 
