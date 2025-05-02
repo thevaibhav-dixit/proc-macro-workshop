@@ -113,22 +113,22 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let name = &info.name;
         if info.each_attr.is_some() {
             let inner_ty = inner_type_of_vec(info.ty);
-            quote! { #name: Vec<#inner_ty>, }
+            quote! { #name: std::vec::Vec<#inner_ty>, }
         } else if is_option(info.ty) {
             let ty = info.ty;
             quote! { #name: #ty, }
         } else {
             let ty = info.ty;
-            quote! { #name: Option<#ty>, }
+            quote! { #name: std::option::Option<#ty>, }
         }
     });
 
     let builder_init = field_infos.iter().map(|info| {
         let name = &info.name;
         if info.each_attr.is_some() {
-            quote! { #name: Vec::new(), }
+            quote! { #name: std::vec::Vec::new(), }
         } else {
-            quote! { #name: None, }
+            quote! { #name: std::option::Option::None, }
         }
     });
 
@@ -147,14 +147,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
             let inner_ty = inner_type_of_option(ty);
             quote! {
                 pub fn #name(&mut self, #name: #inner_ty) -> &mut Self {
-                    self.#name = Some(#name);
+                    self.#name = std::option::Option::Some(#name);
                     self
                 }
             }
         } else {
             quote! {
                 pub fn #name(&mut self, #name: #ty) -> &mut Self {
-                    self.#name = Some(#name);
+                    self.#name = std::option::Option::Some(#name);
                     self
                 }
             }
@@ -192,7 +192,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         impl #builder_ident {
             #(#setters)*
 
-            pub fn build(&mut self) -> Result<#name, Box<dyn std::error::Error>> {
+            pub fn build(&mut self) -> std::result::Result<#name, std::boxed::Box<dyn std::error::Error>> {
                 Ok(#name {
                     #(#build_fields)*
                 })
