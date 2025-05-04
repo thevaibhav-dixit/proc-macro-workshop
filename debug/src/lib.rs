@@ -7,8 +7,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let name = input.ident;
-    let generics = add_trait_bounds(input.generics);
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let fields = match input.data {
         syn::Data::Struct(ref data) => match data.fields {
@@ -17,6 +15,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
         },
         _ => panic!("Only structs are supported"),
     };
+
+    let generics = add_trait_bounds(input.generics, fields);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     struct FieldInfo {
         field: syn::Ident,
@@ -80,11 +81,39 @@ pub fn derive(input: TokenStream) -> TokenStream {
     TokenStream::from(debug_impl)
 }
 
-fn add_trait_bounds(mut generics: syn::Generics) -> syn::Generics {
-    for param in &mut generics.params {
-        if let syn::GenericParam::Type(ref mut type_param) = *param {
-            type_param.bounds.push(syn::parse_quote!(std::fmt::Debug));
+fn add_trait_bounds(
+    mut generics: syn::Generics,
+    fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
+) -> syn::Generics {
+    use syn::{GenericParam, PathArguments, Type};
+
+    let mut phantom_types = std::collections::HashSet::new();
+
+    for field in fields {
+        if let Type::Path(type_path) = &field.ty {
+            if let Some(seg) = type_path.path.segments.first() {
+                if seg.ident == "PhantomData" {
+                    if let PathArguments::AngleBracketed(args) = &seg.arguments {
+                        for arg in &args.args {
+                            if let syn::GenericArgument::Type(Type::Path(type_path)) = arg {
+                                if let Some(ident) = type_path.path.get_ident() {
+                                    phantom_types.insert(ident.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
+
+    for param in &mut generics.params {
+        if let GenericParam::Type(type_param) = param {
+            if !phantom_types.contains(&type_param.ident.to_string()) {
+                type_param.bounds.push(syn::parse_quote!(std::fmt::Debug));
+            }
+        }
+    }
+
     generics
 }
