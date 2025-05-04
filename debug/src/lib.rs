@@ -5,7 +5,11 @@ use syn::{parse_macro_input, DeriveInput};
 #[proc_macro_derive(CustomDebug, attributes(debug))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
+
     let name = input.ident;
+    let generics = add_trait_bounds(input.generics);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     let fields = match input.data {
         syn::Data::Struct(ref data) => match data.fields {
             syn::Fields::Named(ref fields) => &fields.named,
@@ -64,7 +68,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     });
 
     let debug_impl = quote! {
-        impl std::fmt::Debug for #name {
+        impl #impl_generics std::fmt::Debug for #name  #ty_generics #where_clause {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let mut s = f.debug_struct(stringify!(#name));
                 #(#field_names)*
@@ -74,4 +78,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(debug_impl)
+}
+
+fn add_trait_bounds(mut generics: syn::Generics) -> syn::Generics {
+    for param in &mut generics.params {
+        if let syn::GenericParam::Type(ref mut type_param) = *param {
+            type_param.bounds.push(syn::parse_quote!(std::fmt::Debug));
+        }
+    }
+    generics
 }
